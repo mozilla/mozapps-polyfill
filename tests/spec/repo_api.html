@@ -1,0 +1,612 @@
+{% extends "/tests/base.html" %}
+
+{% block name %}
+App Repo API Tests
+{% endblock %}
+
+{% block test %}
+
+  <style type="text/css" media="screen">
+      iframe {
+        display: none;
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+      }
+  </style>
+
+<p> These API tests run in a local environment provided by a test
+  server.  There are multiple local bound ports which coincide with
+  different running apps.  By including /servers.js from the test
+  server, window.SERVERS is populated with a map of server names
+  (directory names) to URL where that app can be accessed.  (Look at
+  the first test to match the dynamic ports against the specific
+  apps.)  </p>
+
+<p> Note: you must manually hit "install" three times during this test
+  for it to be successful.  If you don't, or hit them too slowly, you
+  will get failures. </p>
+
+<section class="test">
+<h3>Verify Testing Environment</h3>
+
+First let's ensure that the testing environment is sane...
+<pre class="doctest setup">
+$ writeln(SERVERS);
+{
+  _primary: "...",
+  app_that_eats_images: "...",
+  app_with_simple_service: "...",
+  bad_content_type: "...",
+  basic_app: "...",
+  json_syntax_error: "...",
+  manifest_with_bom: "...",
+  missing_required_field: "...",
+  no_delegated_install: "...",
+  no_mgmt_api_off_repo_origin: "..."
+}
+$ window.addEventListener("message", function (event) {
+>   console.log('Message: ' + event.data);
+> }, false);
+</pre>
+</section>
+
+<section class="test">
+<h3>Presence of functions</h3>
+
+Are all of the functions present that we would expect on the navigator.mozApps object?
+
+<pre class="doctest">
+$ // We'll show all the methods we're testing
+> var arr = [];
+> function iterateMethods(label, root, suppress) {
+>   for (var f in root) {
+>       if (suppress && suppress.indexOf(f) != -1)
+>           continue;
+>       if (typeof root[f] === 'function')
+>           arr.push(label + f);
+>   }
+> }
+>
+> iterateMethods("navigator.mozApps.", navigator.mozApps, ['setApplicationChooser', 'setRepoOrigin', 'setMockResponse']);
+> iterateMethods("navigator.mozApps.mgmt.", navigator.mozApps.mgmt);
+>
+> arr = arr.sort();
+> for (var i = 0; i < arr.length; i++) writeln(arr[i]);
+navigator.mozApps.getInstalled
+navigator.mozApps.getSelf
+navigator.mozApps.install...
+navigator.mozApps.mgmt.addEventListener
+navigator.mozApps.mgmt.getAll
+navigator.mozApps.mgmt.removeEventListener...
+</pre>
+
+Also a function to help us handle the pending objects:
+
+<pre class="doctest setup">
+$ var lastPending = null;
+$ function spyPending(pending, name, noWait) {
+>   var done = false;
+>   pending.onsuccess = function () {
+>     done = true;
+>     var desc = 'onsuccess:';
+>     if (name) {
+>       desc = name + '.' + desc;
+>     }
+>     writeln(desc, pending.result);
+>   };
+>   pending.onerror = function () {
+>     done = true;
+>     var desc = 'onerror:';
+>     if (name) {
+>       desc = name + '.' + desc;
+>     }
+>     writeln(desc, pending.error);
+>   };
+>   if (! noWait) {
+>     wait(function () {return done;});
+>   }
+>   lastPending = pending;
+> }
+</pre>
+
+</section>
+
+<section class="test">
+<h3>Clear All Apps</h3>
+
+Delete all applications and then verify that getAll() yields no apps.
+
+<pre class="doctest setup">
+$ // Out of curiosity we'll see what's installed:
+> spyPending(navigator.mozApps.mgmt.getAll());
+onsuccess: ...
+$ var finished = false;
+$ function uninstallAll() {
+>   var pendingGetAll = navigator.mozApps.mgmt.getAll();
+>   pendingGetAll.onsuccess = function() {
+>     var m = this.result;
+>     var total = m.length;
+>     finished = (total === 0);
+>     for (var i=0; i&lt;m.length; i++) {
+>       var app = m[i];
+>       var pendingUninstall = app.uninstall();
+>       pendingUninstall.onsuccess = function(r) {
+>         finished = (--total === 0);
+>       };
+>       pendingUninstall.onerror = function () {
+>         finished = true;
+>         writeln('Error:', this.error);
+>         throw('Failed');
+>       };
+>     }
+>   };
+>   return function () {
+>     wait(function () {
+>       if (finished) {
+>         finished = false;
+>         return true;
+>       }
+>     });
+>   };
+> }
+$ uninstallAll()();
+$ spyPending(navigator.mozApps.mgmt.getAll());
+onsuccess: []
+</pre>
+
+</section>
+
+<section class="test">
+<h3>Install missing required arguments will throw</h3>
+
+<pre class="doctest">
+$ navigator.mozApps.install();
+Error: install missing required url argument
+</pre>
+
+</section>
+
+<!-- TODO: Update the App object response in getAll([]) -->
+<section class="test">
+<h3>Install a basic application</h3>
+
+<pre class="doctest">
+$ navigator.mozApps.setMockResponse(true, Spy('setMockResponse', {wait: true}));
+setMockResponse()
+$ spyPending(navigator.mozApps.install(
+>   SERVERS['basic_app'] + "/manifest.webapp",
+>   null));
+onsuccess: {
+  installOrigin: "http://?:?",
+  installTime: ?,
+  manifest: {installs_allowed_from: ["*"], name: "Super Crazy Basic App"},
+  manifestURL: "http://?:?/manifest.webapp",
+  origin: "http://?:?",
+  receipts: null
+}
+$ spyPending(navigator.mozApps.mgmt.getAll());
+onsuccess: [
+      {
+        installOrigin: "http://?:?",
+        installTime: ?,
+        manifest: {installs_allowed_from: ["*"], name: "Super Crazy Basic App"},
+        manifestURL: "http://?:?/manifest.webapp",
+        origin: "http://?:?",
+        receipts: null
+      }
+    ]
+$ writeln(lastPending.result[0].installOrigin, SERVERS['_primary']);
+> writeln(lastPending.result[0].installOrigin == SERVERS['_primary']);
+> writeln(lastPending.result[0].installOrigin == SERVERS['basic_app']);
+...
+true
+false
+</pre>
+
+<h3>Re-install that application with a different manifest</h3>
+
+this should be considered an "upgrade", because we may not have
+two manifests per origin.
+
+<pre class="doctest">
+$ navigator.mozApps.setMockResponse(true, Spy('setMockResponse', {wait: true}));
+setMockResponse()
+$ spyPending(navigator.mozApps.install(
+>   SERVERS['basic_app'] + "/manifest2.webapp",
+>   null));
+onsuccess: {...}
+$ spyPending(navigator.mozApps.mgmt.getAll());
+onsuccess: [
+  {
+    installOrigin: "http://...:...",
+    installTime: ...,
+    manifest: {installs_allowed_from: ["*"], name: "Wild and Crazy Basic App"},
+    manifestURL: "http://?:?/manifest2.webapp",
+    origin: "http://...:...",
+    receipts: null
+  }
+]
+</pre>
+
+<h3>We installed it, getInstalled should return it.</h3>
+
+<pre class="doctest">
+$ spyPending(navigator.mozApps.getInstalled());
+onsuccess: [
+  {
+    installOrigin: "http://...:...",
+    installTime: ...,
+    manifest: {installs_allowed_from: ["*"], name: "Wild and Crazy Basic App"},
+    manifestURL: "http://?:?/manifest2.webapp",
+    origin: "http://...:...",
+    receipts: null
+  }
+]
+</pre>
+
+<h3>getSelf should not.</h3>
+
+<pre class="doctest">
+$ spyPending(navigator.mozApps.getSelf());
+onsuccess: null
+</pre>
+
+<h3>getSelf from basic app's domain <em>should</em> show the new app</h3>
+
+<p>Note: we're talking with the other app via JSChannel so that we can
+have it call <code>getSelf</code> instead of the test calling
+<code>getSelf</code> (which as we showed above won't return
+anything).</p>
+
+<!-- TODO: Fixup success call -->
+<pre class="doctest">
+$ var chan = embedIFrameAndStartChannel(SERVERS['basic_app'] + "/include.html");
+> chan.call(buildJSChanArgs("getSelf", true));
+success({
+  installOrigin: "http://...:...",
+  installTime: ...,
+  manifest: {installs_allowed_from: ["*"], name: "Wild and Crazy Basic App"},
+  manifestURL: "http://?:?/manifest2.webapp",
+  origin: "http://...:...",
+  receipts: null
+})
+</pre>
+
+</section>
+
+<section class="test">
+<h3>Installation of an app with a syntax error in manifest</h3>
+
+<pre class="doctest">
+$ spyPending(navigator.mozApps.install(
+>   SERVERS['json_syntax_error'] + "/manifest.webapp",
+>   null));
+onerror: MANIFEST_PARSE_ERROR
+</pre>
+
+</section>
+
+<section class="test">
+<h3>Installation of an app with a malformed manifest (missing key)</h3>
+
+<pre class="doctest">
+$ spyPending(navigator.mozApps.install(
+>   SERVERS['missing_required_field'] + "/manifest.webapp",
+>   null));
+onerror: INVALID_MANIFEST
+</pre>
+
+</section>
+
+<section class="test">
+<h3>Installation of an app without required HTTP Content-Type</h3>
+
+<pre class="doctest">
+$ spyPending(navigator.mozApps.install(
+>   SERVERS['bad_content_type'] + "/manifest.json",
+>   null));
+onerror: INVALID_MANIFEST
+</pre>
+
+</section>
+
+<section class="test">
+<h3>Installation of an app without delegated installation permissions</h3>
+
+<pre class="doctest">
+$ spyPending(navigator.mozApps.install(
+>   SERVERS['no_delegated_install'] + "/manifest.webapp",
+>   null));
+onerror: PERMISSION_DENIED
+</pre>
+
+</section>
+
+<section class="test">
+<h3>Installation of that same app, from its own origin</h3>
+
+<p>NOTE:  This is a rather tricky test:  We'll programatically embed an iframe from
+a non-repo origin and load web content from that origin.  The content
+(<tt>no_mgmt_api_off_repo_origin/include.html</tt>) uses jschannel to allow us
+to programmatically drive it running queries against the test app repo from
+off domain.</p>
+
+<!-- TODO: Update postMessage listener on other side? -->
+<pre class="doctest">
+$ var chan = embedIFrameAndStartChannel(SERVERS['no_delegated_install'] + "/include.html");
+$ chan.call(buildJSChanArgs("install", true));
+success()
+$ // now getInstalled should show that we're installed
+> chan.call(buildJSChanArgs("getSelf", true));
+success({
+  installOrigin: "http://...:...",
+  installTime: ...,
+  manifest: {name: "An application which does not grant permission for any other origin to install it"},
+  manifestURL: "http://?:?/manifest.webapp",
+  origin: "http://...:...",
+  receipts: null
+})
+$ // and getInstalledBy should show that same result
+> chan.call(buildJSChanArgs("getInstalled", true));
+success([
+  {
+    installOrigin: "http://...:...",
+    installTime: ...,
+    manifest: {name: "An application which does not grant permission for any other origin to install it"},
+    manifestURL: "http://?:?/manifest.webapp",
+    origin: "http://...:...",
+    receipts: null
+  }
+])
+</pre>
+
+<h3>getInstalled from origin shouldn't show second app</h3>
+
+<pre class="doctest">
+$ spyPending(navigator.mozApps.getInstalled());
+onsuccess: [
+  {
+    installOrigin: "http://...:...",
+    installTime: ...,
+    manifest: {installs_allowed_from: ["*"], name: "Wild and Crazy Basic App"},
+    manifestURL: "http://?:?/manifest2.webapp",
+    origin: "http://...:...",
+    receipts: null
+  }
+]
+</pre>
+
+<h3>getAll should now contain two apps</h3>
+
+<pre class="doctest">
+$ var spy = Spy('list');
+> var pendingGetAll = navigator.mozApps.mgmt.getAll();
+> pendingGetAll.onsuccess = function() {
+>   for (var i=0; i&lt;this.result.length; i++) {
+>     writeln('Origin: ', this.result[i].origin);
+>   }
+>   spy.func(i);
+>  };
+> spy.wait();
+Origin: ...
+Origin: ...
+list(2)
+</pre>
+
+<h3>Verify mgmt.getAll don't work off repo origin</h3>
+
+<pre class="doctest">
+$ // first let's add an iframe with the child to the document */
+> var chan = embedIFrameAndStartChannel(SERVERS['no_mgmt_api_off_repo_origin'] + "/include.html");
+$ // Note the exact error here is not so clear, so we kind of punt:
+> chan.call(buildJSChanArgs("getAll", false));
+error("...")
+</pre>
+
+</section>
+
+<!-- This call no longer relevant
+<section class="test">
+<h3>Verify proper errors from uninstall()</h3>
+<pre class="doctest">
+$ navigator.mozApps.mgmt.uninstall(
+>    "http://nosuch.app",
+>    Spy('success', {wait: false}),
+>    Spy('error', {wait: true}));
+error({code: "noSuchApplication", message: "no application exists with the origin: http://nosuch.app"})
+</pre>
+
+</section>
+-->
+
+<section class="test">
+<h3>Verify no callbacks are required to uninstall()</h3>
+
+<p>All args are optional to uninstall.  To test this we'll uninstall
+one app, wait 200ms, and then verify that list returns a single app.</p>
+
+<pre class="doctest">
+$ var pendingGetAll1 = navigator.mozApps.mgmt.getAll();
+> pendingGetAll1.onsuccess = function() {
+>   spyPending(this.result[0].uninstall(), 'firstUninstall', true);
+>   spyPending(this.result[0].uninstall(), 'secondUninstall', true);
+> };
+> wait(200);
+firstUninstall.onsuccess: null
+secondUninstall.onerror: NOT_INSTALLED
+$ spyPending(navigator.mozApps.mgmt.getAll());
+onsuccess: [
+  {
+    installOrigin: "http://...:...",
+    installTime: ...,
+    manifest: {name: "An application which does not grant permission for any other origin to install it"},
+    manifestURL: "http://?:?/manifest.webapp",
+    origin: "http://...:...",
+    receipts: null
+  }
+]
+</pre>
+
+</section>
+
+<section class="test">
+<h3>Install an app with a UTF-8 BOM in the manifest</h3>
+
+<pre class="doctest">
+$ spyPending(navigator.mozApps.install(
+>   SERVERS['manifest_with_bom'] + "/manifest.webapp",
+>   null));
+onsuccess: {...}
+</section>
+
+
+<!-- TODO: Figure out what we want to do with activities
+<section class="test">
+<h3>Install an application that contains a profile provider service</h3>
+
+<pre class="doctest">
+$ navigator.mozApps.install(
+>   SERVERS['app_with_simple_service'] + "/manifest.webapp",
+>   null,
+>   Spy('apps.install', {wait: true}),
+>   Spy('apps.install.error', {wait: false}));
+apps.install()
+</pre>
+</section>
+-->
+
+
+<section class="test">
+<h3>Events</h3>
+
+<p>First we'll just test that adding and removing watchers works</p>
+
+<pre class="doctest">
+$ uninstallAll()();
+$ installSpy = Spy('install');
+$ uninstallSpy = Spy('uninstall');
+$ navigator.mozApps.mgmt.addEventListener('install', installSpy);
+$ navigator.mozApps.mgmt.onuninstall = uninstallSpy;
+$ deadSpy = Spy('should_not_fire');
+$ navigator.mozApps.mgmt.addEventListener('install', deadSpy);
+$ navigator.mozApps.mgmt.removeEventListener('install', deadSpy);
+</pre>
+
+<p>Next we'll install and remove apps to get the events:</p>
+
+<pre class="doctest">
+$ spyPending(navigator.mozApps.install(
+>   SERVERS['basic_app'] + "/manifest.webapp"))
+install({
+  application: {
+    installOrigin: "http://?:?",
+    installTime: ?,
+    manifest: {installs_allowed_from: ["*"], name: "Super Crazy Basic App"},
+    manifestURL: "http://?:?/manifest.webapp",
+    origin: "http://?:?",
+    receipts: null
+  }
+})
+onsuccess: {...}
+$ spyPending(lastPending.result.uninstall());
+uninstall({
+  application: {
+    installOrigin: "http://127.0.0.1:?",
+    installTime: ?,
+    manifest: {installs_allowed_from: ["*"], name: "Super Crazy Basic App"},
+    manifestURL: "http://?:?/manifest.webapp",
+    origin: "http://127.0.0.1:?",
+    receipts: null
+  }
+})
+onsuccess: null
+</pre>
+
+<p>Now we'll install an app in an iframe, and check that we detect the change
+in this page:</p>
+
+<pre class="doctest">
+$ var chan = embedIFrameAndStartChannel(SERVERS['no_delegated_install'] + "/include.html");
+$ chan.call(buildJSChanArgs("install", true));
+> // because the spy has been called many times, we must clear its wait flag:
+> installSpy.calledWait = false;
+> installSpy.wait();
+install({
+  application: {
+    installOrigin: "http://127.0.0.1:?",
+    installTime: ?,
+    manifest: {name: "An application which does not grant permission for any other origin to install it"},
+    manifestURL: "http://?:?/manifest.webapp",
+    origin: "http://127.0.0.1:?",
+    receipts: null
+  }
+})
+success()
+</pre>
+
+</section>
+
+
+{% endblock %}
+
+{% block extrajs %}
+<script type="text/javascript">
+  if (navigator.mozApps.setRepoOrigin) {
+    navigator.mozApps.setRepoOrigin(SERVERS['_primary']);
+  }
+
+  // a utility function to make it quick to attach iframes and establish jschannels to them:
+  // this serves as the basis for several different types of cross-origin tests
+  function embedIFrameAndStartChannel(url) {
+    var iframe = document.createElement("iframe");
+    iframe.src = url;
+    iframe.height = window.innerHeight + 'px';
+    iframe.width = window.innerWidth + 'px';
+    document.body.appendChild(iframe);
+    // next, let's connect to her over a jschannel
+    var chan =  Channel.build({
+        window: iframe.contentWindow,
+        scope: "test",
+        origin: "*"
+    });
+    return chan;
+  }
+
+  // a utility function to automatically build up proper jschan.call args:
+  function buildJSChanArgs(name, shouldSucceed) {
+    return { method: name,
+             success: Spy('success', {wait: shouldSucceed}),
+             error: Spy('error', {wait: !shouldSucceed}) };
+  }
+
+  // given an origin of a host, find the iframe associated with it and
+  // maximize it
+  function showIFrame(origin) {
+    var tags = document.getElementsByTagName('iframe');
+    for (var i = 0; i < tags.length; i++) {
+      if (0 === tags[i].getAttribute('src').indexOf(origin)) {
+        tags[i].style.display = "block";
+        return;
+      }
+    }
+  }
+
+  function hideIFrame(origin) {
+    var tags = document.getElementsByTagName('iframe');
+    for (var i = 0; i < tags.length; i++) {
+      if (0 === tags[i].getAttribute('src').indexOf(origin)) {
+        tags[i].style.display = "none";
+        return;
+      }
+    }
+  }
+
+// give the testor plenty of time to click
+doctest.defaultTimeout = 5000;
+
+</script>
+
+{% endblock %}

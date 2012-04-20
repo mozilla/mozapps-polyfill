@@ -1,0 +1,52 @@
+{% extends "/tests/base.html" %}
+
+{% block name %}
+Conduit Abstraction Tests
+{% endblock %}
+
+{% block test %}
+
+<p> These are low level tests of the HTML5 conduit abstraction --
+    this is the thing that's responsible for loading conduits into an
+    iframe and managing communication with them.
+</p>
+
+<div class="test">
+<h3>Allocation test</h3>
+
+<pre class="doctest">
+$ theConduit = new Conduit(SERVERS['app_with_simple_service'] + "/aboutme_svc.html");
+> var props = [];
+> for (var k in theConduit) {
+>   if (theConduit.hasOwnProperty(k)) props.push(k);
+> }
+> props.sort();
+["invoke"]
+</pre>
+</div>
+
+<div class="test">
+<h3>Invocation test</h3>
+
+<pre class="doctest">
+$ theConduit.invoke("profile.get", [ "displayName" ], Spy('success', {wait: true}), Spy('error'));
+success({displayName: "Mork Hashimoto"})
+$ theConduit.invoke("profile.get", [ "drinker", "emails" ], Spy('success', {wait: true}), Spy('error'));
+success({
+  drinker: "heavily",
+  emails: [
+    {primary: "true", type: "work", value: "mhashimoto-04@plaxo.com"},
+    {type: "home", value: "mhashimoto-04@plaxo.com"},
+    {type: "home", value: "mhashimoto@plaxo.com"}
+  ]
+})
+</pre>
+</div>
+
+{% endblock %}
+
+{% block extrajs %}
+    <script type="text/javascript" src="/jsapi/urlmatch.js"></script>
+    <script type="text/javascript" src="/jsapi/conduit.js"></script>
+{% endblock %}
+
