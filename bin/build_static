@@ -96,3 +96,6 @@ echo "Creating minified jsapi/include.js"
 cp ${DEST}/jsapi/include.js ${DEST}/jsapi/include.complete.js
 echo "/* For unminified source see ${HOST}/jsapi/include.complete.js */" > ${DEST}/jsapi/include.js
 java -jar ${COMP_DIR}/yuicompressor-2.4.2.jar ${DEST}/jsapi/include.complete.js >> ${DEST}/jsapi/include.js
+
+echo "Moving homepage into place"
+mv ${DEST}/jsapi/apps.persona.org-index.html ${DEST}/index.html
