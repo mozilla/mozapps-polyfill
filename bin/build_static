@@ -15,8 +15,8 @@ regex_escape () {
 
 HERE="$(dirname $(abspath $BASH_SOURCE))"
 SITE="$(dirname $HERE)/"
-HOST="https://myapps.mozillalabs.com"
-ORIG_HOST="$HOST"
+HOST="https://apps.persona.org"
+ORIG_HOST="https://myapps.mozillalabs.com"
 APPDIR=""
 
 help () {
@@ -66,7 +66,7 @@ if [ ! -e "$DEST" ] ; then
     mkdir -p "$DEST"
 fi
 
-cp -R -L ${SITE}/jsapi $DEST
+cp -R -L ${SITE}/jsapi/* $DEST
 
 if [ ! -z "$APPDIR" ] ; then
     mkdir -p ${DEST}/apps
@@ -88,14 +88,14 @@ if [ ! -e "$COMP_DIR" ] ; then
     (cd $COMP_DIR ; unzip -j yuicompressor-2.4.2.zip yuicompressor-2.4.2/build/yuicompressor-2.4.2.jar)
 fi
 
-echo "Creating minified jsapi/include.html"
-cp ${DEST}/jsapi/include.html ${DEST}/jsapi/include.complete.html
-${HERE}/compress_html.py ${DEST}/jsapi/include.html -o ${DEST}/jsapi/include.html --compress --compressor-dir "$COMP_DIR" --comment "The original (unminified) source is at ${HOST}/jsapi/include.complete.html"
+echo "Creating minified include.html"
+cp ${DEST}/include.html ${DEST}/include.complete.html
+${HERE}/compress_html.py ${DEST}/include.html -o ${DEST}/include.html --compress --compressor-dir "$COMP_DIR" --comment "The original (unminified) source is at ${HOST}/include.complete.html"
 
-echo "Creating minified jsapi/include.js"
-cp ${DEST}/jsapi/include.js ${DEST}/jsapi/include.complete.js
-echo "/* For unminified source see ${HOST}/jsapi/include.complete.js */" > ${DEST}/jsapi/include.js
-java -jar ${COMP_DIR}/yuicompressor-2.4.2.jar ${DEST}/jsapi/include.complete.js >> ${DEST}/jsapi/include.js
+echo "Creating minified include.js"
+cp ${DEST}/include.js ${DEST}/include.complete.js
+echo "/* For unminified source see ${HOST}/include.complete.js */" > ${DEST}/include.js
+java -jar ${COMP_DIR}/yuicompressor-2.4.2.jar ${DEST}/include.complete.js >> ${DEST}/include.js
 
 echo "Moving homepage into place"
-mv ${DEST}/jsapi/apps.persona.org-index.html ${DEST}/index.html
+mv ${DEST}/apps.persona.org-index.html ${DEST}/index.html

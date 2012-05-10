@@ -13,7 +13,7 @@ The libraries here are published at https://apps.persona.org and they should
 be used only at that domain (except for testing and development of course). 
 You should include:
 
-    <script src="https://apps.persona.org/jsapi/include.js"></script>
+    <script src="https://apps.persona.org/include.js"></script>
 
 in your page.  If the browser already natively supports `navigator.mozApps`
 this include will do nothing, but if not it will patch in this support.

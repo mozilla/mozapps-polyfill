@@ -625,7 +625,7 @@ if (!navigator.mozApps.install || navigator.mozApps.html5Implementation) {
     var win = window;
 
     var AppRepositoryOrigin = "https://myapps.mozillalabs.com";
-    var AppRepositoryIncludePath = "/jsapi/include.html";
+    var AppRepositoryIncludePath = "/include.html";
 
     // Cached references
     var iframe = null;
