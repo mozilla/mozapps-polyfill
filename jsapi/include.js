@@ -44,15 +44,20 @@
 **/
 
 // inject into navigator.mozApps if it doesn't exist
-if (!navigator.mozApps) {
+/*if (!navigator.mozApps) {
   navigator.mozApps = {};
+}*/
+
+if (window.console) {
+  console.log('navigator.mozApps polyfill DECPRECATED.');
 }
 
 // inject if navigator.mozApps.install isn't defined or if
 // navigator.mozApps.html5Implementation is true  (this latter check
 // works around bad firefox behavior which doesn't properly
 // restoring navigator.XXX to a pristine state upon reload)
-if (!navigator.mozApps.install || navigator.mozApps.html5Implementation) {
+// Disabling polyfill:
+if (false && (!navigator.mozApps.install || navigator.mozApps.html5Implementation)) {
   navigator.mozApps = (function() {
 
     ////////////////////////////////////////////////////////////
@@ -636,18 +641,18 @@ if (!navigator.mozApps.install || navigator.mozApps.html5Implementation) {
     /* const */
     var overlayId = "myappsOrgInstallOverlay"; /* const */
     var dialogId = "myappsTrustedIFrame";
-    
+
     function hasMgmtPermission() {
       return location.protocol + "//" + location.host == AppRepositoryOrigin;
     }
-    
+
     function Pending() {
       this.result = null;
       this.error = null;
       this.onerror = null;
       this.onsuccess = null;
     }
-    
+
     // Some helpers for Pending objects; though these look like nice candidates
     // for methods, we don't want to leak any methods to the callers:
     function pendingError(pending, error) {
@@ -656,7 +661,7 @@ if (!navigator.mozApps.install || navigator.mozApps.html5Implementation) {
         pending.onerror();
       }
     }
-    
+
     function pendingSuccess(pending, result) {
       if (result !== undefined) {
         pending.result = result;
@@ -953,17 +958,17 @@ if (!navigator.mozApps.install || navigator.mozApps.html5Implementation) {
 
     function callReady(args) {
     }
-    
+
     var changeBound = false;
     var boundEventListeners = {};
-    
+
     function callAddEventListener(eventName, callback) {
       if (! boundEventListeners[eventName]) {
         boundEventListeners[eventName] = [];
       }
       boundEventListeners[eventName].push(callback);
     }
-    
+
     function callRemoveEventListener(eventName, callback) {
       if (! boundEventListeners[eventName]) {
         return;
@@ -976,7 +981,7 @@ if (!navigator.mozApps.install || navigator.mozApps.html5Implementation) {
         }
       }
     }
-    
+
     if (hasMgmtPermission()) {
       window.addEventListener('load', function () {
         setupWindow();
@@ -1028,7 +1033,7 @@ if (!navigator.mozApps.install || navigator.mozApps.html5Implementation) {
       },
       html5Implementation: true
     };
-    
+
     if (hasMgmtPermission()) {
       api.mgmt = {
         getAll: callGetAll,
@@ -1038,7 +1043,7 @@ if (!navigator.mozApps.install || navigator.mozApps.html5Implementation) {
         onuninstall: null
       };
     }
-    
+
     if (TESTING_MODE) {
       // a debugging routine which allows debugging or testing clients
       // to point at a repository location other than production.
