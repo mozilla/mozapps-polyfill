@@ -5,14 +5,10 @@ var util = require("util"),
 http = require("http"),
 url = require("url"),
 path = require("path"),
-fs = require("fs"),
-template = require("./serverjs/djangode/template/template"),
-template_loader = require("./serverjs/djangode/template/loader");
+fs = require("fs");
 
 const SPEC_DIR = path.join(path.dirname(__dirname), "spec");
 const STATIC_DIR = path.join(path.dirname(__dirname));
-
-template_loader.set_path(STATIC_DIR);
 
 var appjson = [];
 
@@ -52,7 +48,6 @@ function createServer(obj, callback) {
     var hostname = request.headers['host'].toString("utf8");
     var port = parseInt(hostname.split(':')[1]);
     var host = hostname.split(':')[0];
-    template_loader.flush();
 
     // normalize 'localhost', so it just works.
     if (host === 'localhost') {
@@ -223,12 +218,9 @@ for (var i = 0; i < process.argv.length; i++) {
 function primaryHandler(req, resp) {
   var urlpath = url.parse(req.url).pathname;
 
-  /* We only want to use the template_loader for HTML
-   * files, all other files use the standard serveFileIndex
-   * since all the background work for mime types is set up.
-   */
   var specs = getSpecs();
-  var tests = []; 
+  var tests = [];
+  resp.end(result)
   if(urlpath.match(/\.html$/)) {
     specs.forEach(function (spec, index) {
       if (spec !== 'run-all.html') {
